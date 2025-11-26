@@ -1,4 +1,4 @@
-const API_BASE = 'http://192.168.43.203:5000/api';
+const API_BASE = 'https://medrec-backend.onrender.com/api';
 
 // State
 let currentUser = null;
