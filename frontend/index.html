@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedRec - Smart Medicine Recommendations</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="logo">MedRec</div>
+        <ul class="nav-links">
+            <li><a href="#" id="nav-home">Home</a></li>
+            <li><a href="#features">Features</a></li>
+            <li><a href="#contact">Contact</a></li>
+            <li><a href="#about">About</a></li>
+        </ul>
+        <div class="auth-buttons" id="auth-buttons">
+            <button id="btn-login" class="btn btn-outline">Login</button>
+            <button id="btn-register" class="btn btn-primary">Register</button>
+        </div>
+        <div class="user-info hidden" id="user-info">
+            <span id="welcome-msg">Welcome, User</span>
+            <button id="btn-logout" class="btn btn-sm">Logout</button>
+        </div>
+    </nav>
+
+    <!-- Hero Section (Visible when not logged in) -->
+    <header class="hero" id="hero-section">
+        <div class="hero-content">
+            <h1>Your Personal Health Assistant</h1>
+            <p>Get instant medicine suggestions based on your symptoms and connect with top doctors.</p>
+            <button class="btn btn-primary btn-lg" id="btn-get-started">Get Started</button>
+        </div>
+    </header>
+
+    <!-- Features Section -->
+    <section id="features" class="landing-section">
+        <div class="container">
+            <h2>Features</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h3>Smart Suggestions</h3>
+                    <p>Get instant medicine recommendations based on your symptoms using our advanced AI.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Top Doctors</h3>
+                    <p>Connect with and follow leading specialists in various fields.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Secure & Private</h3>
+                    <p>Your health data is encrypted and secure with us.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="landing-section bg-light">
+        <div class="container">
+            <h2>About Us</h2>
+            <p>MedRec is dedicated to making healthcare accessible and understandable. We bridge the gap between symptoms and immediate relief while connecting you with professional care when needed.</p>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="landing-section">
+        <div class="container">
+            <h2>Contact Us</h2>
+            <p>Have questions? Reach out to our support team.</p>
+            <div class="contact-info">
+                <p>Email: support@medrec.com</p>
+                <p>Phone: +1 (555) 123-4567</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Dashboard (Visible when logged in) -->
+    <main class="dashboard hidden" id="dashboard-section">
+        
+        <!-- Doctor Section -->
+        <section class="doctors-section">
+            <h2>Top Doctors</h2>
+            <div class="doctor-grid" id="doctor-list">
+                <!-- Doctor Cards Injected Here -->
+                <div class="loading">Loading doctors...</div>
+            </div>
+        </section>
+
+        <!-- Suggestion Section -->
+        <section class="suggestion-section">
+            <div class="suggestion-container">
+                <div class="form-box">
+                    <h2>Get Recommendation</h2>
+                    <form id="suggestion-form">
+                        <div class="form-group">
+                            <label for="symptoms">Describe your symptoms</label>
+                            <textarea id="symptoms" rows="4" placeholder="e.g., I have a severe headache and slight fever..." required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="doctor-select">Preferred Doctor (Optional)</label>
+                            <select id="doctor-select">
+                                <option value="">-- Any Doctor --</option>
+                                <!-- Options Injected Here -->
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Get Suggestions</button>
+                    </form>
+                </div>
+
+                <div class="results-box hidden" id="results-box">
+                    <h3>Suggested Medicines</h3>
+                    <div id="medicine-list">
+                        <!-- Results Injected Here -->
+                    </div>
+                </div>
+
+                <!-- History Section -->
+                <section class="history-section" id="history-section">
+                    <h3>My History</h3>
+                    <div id="history-list" class="history-list">
+                        <p>Loading history...</p>
+                    </div>
+                </section>
+            </div>
+        </section>
+    </main>
+
+    <!-- Doctor Dashboard (Visible when doctor logged in) -->
+    <main class="dashboard hidden" id="doctor-dashboard-section">
+        <h2>Doctor Dashboard</h2>
+        <div class="doctor-requests" id="doctor-requests-list">
+            <!-- Requests Injected Here -->
+            <div class="loading">Loading requests...</div>
+        </div>
+
+        <h3 style="margin-top: 40px;">Completed Requests</h3>
+        <div class="doctor-requests" id="doctor-history-list">
+            <div class="loading">Loading history...</div>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <div class="modal-overlay hidden" id="modal-overlay">
+        
+        <!-- Login Modal -->
+        <div class="modal hidden" id="login-modal">
+            <div class="modal-header">
+                <h3>Login</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="login-type-toggle">
+                <button class="btn btn-sm btn-primary" id="type-user">User</button>
+                <button class="btn btn-sm btn-outline" id="type-doctor">Doctor</button>
+            </div>
+            <form id="login-form">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="login-email" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="login-password" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Login</button>
+                <p class="switch-auth">Don't have an account? <a href="#" id="switch-to-register">Register</a></p>
+            </form>
+        </div>
+
+        <!-- Register Modal -->
+        <div class="modal hidden" id="register-modal">
+            <div class="modal-header">
+                <h3>Register</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="login-type-toggle">
+                <button class="btn btn-sm btn-primary" id="reg-type-user">User</button>
+                <button class="btn btn-sm btn-outline" id="reg-type-doctor">Doctor</button>
+            </div>
+            <form id="register-form">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="reg-name" required>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="reg-email" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="reg-password" required>
+                </div>
+                
+                <!-- Doctor Fields -->
+                <div id="doctor-fields" class="hidden">
+                    <div class="form-group">
+                        <label>Speciality</label>
+                        <input type="text" id="reg-speciality" placeholder="e.g. Cardiologist">
+                    </div>
+                    <div class="form-group">
+                        <label>Bio</label>
+                        <textarea id="reg-bio" rows="2" placeholder="Short bio..."></textarea>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block">Register</button>
+                <p class="switch-auth">Already have an account? <a href="#" id="switch-to-login">Login</a></p>
+            </form>
+        </div>
+    </div>
+
+    <div id="notification-container" class="notification-container"></div>
+    <script src="app.js"></script>
+</body>
+</html>
