@@ -1,4 +1,4 @@
-const API_BASE = 'https://medrec-backend.onrender.com/api';
+const API_BASE = 'https://medrec-smart-health.onrender.com/api';
 
 // State
 let currentUser = null;
