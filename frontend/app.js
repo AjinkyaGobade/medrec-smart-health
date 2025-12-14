@@ -1,4 +1,6 @@
 const API_BASE = 'https://medrec-smart-health.onrender.com/api';
+const SOCKET_URL = 'https://medrec-smart-health.onrender.com';
+const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
 
 // State
 let currentUser = null;
@@ -45,6 +47,16 @@ const doctorRequestsList = document.getElementById('doctor-requests-list');
 const doctorHistoryList = document.getElementById('doctor-history-list');
 const historyList = document.getElementById('history-list');
 
+// Chat Elements
+const chatWidget = document.getElementById('chat-widget');
+const chatTitle = document.getElementById('chat-title');
+const chatMessages = document.getElementById('chat-messages');
+const chatInput = document.getElementById('chat-input');
+const chatForm = document.getElementById('chat-form');
+const closeChatBtn = document.getElementById('close-chat');
+
+let currentChatId = null;
+
 // --- Initialization ---
 
 function init() {
@@ -59,6 +71,27 @@ function init() {
     } else {
         showHero();
     }
+
+    // Socket Listeners
+    setupSocketListeners();
+}
+
+function setupSocketListeners() {
+    socket.on('load_messages', (messages) => {
+        chatMessages.innerHTML = ''; // Clear
+        messages.forEach(msg => appendMessage(msg));
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    });
+
+    socket.on('receive_message', (msg) => {
+        if (msg.consultation_id === currentChatId) {
+            appendMessage(msg);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        } else {
+            // Optional: Show notification if chat is closed
+            showNotification(`New message from ${msg.sender_name}`);
+        }
+    });
 }
 
 // --- UI Transitions ---
@@ -138,9 +171,9 @@ async function handleRegister(e) {
     const name = document.getElementById('reg-name').value;
     const email = document.getElementById('reg-email').value;
     const password = document.getElementById('reg-password').value;
-    
+
     const payload = { name, email, password, type: registerType };
-    
+
     if (registerType === 'doctor') {
         payload.speciality = document.getElementById('reg-speciality').value;
         payload.bio = document.getElementById('reg-bio').value;
@@ -173,7 +206,7 @@ function showHero() {
     heroSection.classList.remove('hidden');
     dashboardSection.classList.add('hidden');
     doctorDashboardSection.classList.add('hidden');
-    
+
     authButtons.classList.remove('hidden');
     userInfo.classList.add('hidden');
 }
@@ -212,11 +245,11 @@ function logout() {
 
 function startPolling() {
     stopPolling(); // Clear existing if any
-    
+
     // Poll every 3 seconds
     pollingInterval = setInterval(() => {
         if (!token || !currentUser) return stopPolling();
-        
+
         if (currentUser.role === 'doctor') {
             loadDoctorRequests(true); // true = isPolling
         } else {
@@ -239,14 +272,14 @@ async function loadDoctors() {
         const res = await fetch(`${API_BASE}/doctors`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (res.status === 401 || res.status === 403) {
             logout();
             return;
         }
 
         const doctors = await res.json();
-        
+
         if (res.ok) {
             renderDoctors(doctors);
             populateDoctorSelect(doctors);
@@ -271,7 +304,7 @@ function renderDoctors(doctors) {
 }
 
 function populateDoctorSelect(doctors) {
-    doctorSelect.innerHTML = '<option value="">-- Any Doctor --</option>' + 
+    doctorSelect.innerHTML = '<option value="">-- Any Doctor --</option>' +
         doctors.map(doc => `<option value="${doc.id}">${doc.name} (${doc.speciality})</option>`).join('');
 }
 
@@ -280,7 +313,7 @@ async function toggleFollow(doctorId, isFollowed) {
     try {
         const res = await fetch(`${API_BASE}/doctors/${doctorId}/follow`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
@@ -303,7 +336,7 @@ async function handleSuggestion(e) {
     try {
         const res = await fetch(`${API_BASE}/suggest`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
@@ -316,7 +349,7 @@ async function handleSuggestion(e) {
         }
 
         const data = await res.json();
-        
+
         if (res.ok) {
             if (data.status === 'pending') {
                 resultsBox.classList.add('hidden');
@@ -355,7 +388,7 @@ async function loadHistory(isPolling = false) {
         const res = await fetch(`${API_BASE}/user/consultations`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (res.status === 401 || res.status === 403) {
             if (!isPolling) logout(); // Only logout on explicit action, polling just stops ideally but logout is safer
             return;
@@ -396,7 +429,7 @@ function renderHistory(consultations) {
                     <strong style="color: var(--primary-color); display: block; margin-bottom: 5px;">Prescribed Medicines:</strong>
                     <ul style="list-style: none; padding-left: 0;">
                         ${c.prescriptions.map(p => `
-                            <li style="margin-bottom: 4px; font-size: 0.95rem; color: var(--text-light);">
+                            <li>
                                 ${p.name} <span style="color: var(--text-muted);">(${p.reason})</span>
                                 ${!p.safe ? '<span style="color: var(--danger-color); font-size: 0.8em; margin-left: 5px;">⚠</span>' : ''}
                             </li>
@@ -404,6 +437,7 @@ function renderHistory(consultations) {
                     </ul>
                 </div>
             ` : ''}
+            <button class="btn btn-sm btn-outline" style="margin-top:10px; width:100%;" onclick="openChat(${c.id}, '${c.doctor_name || 'Doctor'}')">Chat with Doctor</button>
         </div>
     `).join('');
 }
@@ -416,7 +450,7 @@ async function loadDoctorRequests(isPolling = false) {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const requests = await res.json();
-        
+
         // Data Diffing to prevent UI flickering / input loss
         const jsonString = JSON.stringify(requests);
         if (isPolling && jsonString === lastDoctorRequests) {
@@ -468,8 +502,9 @@ async function renderDoctorRequests(requests) {
                     <button class="btn btn-sm btn-primary" onclick="addMedicine(${req.id})">Add</button>
                 </div>
             </div>
-            <div class="request-actions">
-                <button class="btn btn-primary" onclick="approveRequest(${req.id})">Approve & Send</button>
+            <div class="request-actions" style="display:flex; gap:10px;">
+                <button class="btn btn-primary" style="flex:1;" onclick="approveRequest(${req.id})">Approve & Send</button>
+                <button class="btn btn-outline" style="flex:1;" onclick="openChat(${req.id}, '${req.user_name}')">Chat</button>
             </div>
         </div>
     `).join('');
@@ -486,13 +521,13 @@ async function addMedicine(consultationId) {
     try {
         const res = await fetch(`${API_BASE}/doctor/consultations/${consultationId}/modify`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ 
-                action: 'add', 
-                medicine: { name, reason, safe: true } 
+            body: JSON.stringify({
+                action: 'add',
+                medicine: { name, reason, safe: true }
             })
         });
         if (res.ok) {
@@ -506,13 +541,13 @@ async function deleteMedicine(consultationId, medId) {
     try {
         const res = await fetch(`${API_BASE}/doctor/consultations/${consultationId}/modify`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ 
-                action: 'delete', 
-                medicine: { id: medId } 
+            body: JSON.stringify({
+                action: 'delete',
+                medicine: { id: medId }
             })
         });
         if (res.ok) {
@@ -583,6 +618,7 @@ async function renderDoctorHistory(history) {
             <div class="timestamp" style="margin-top: 10px; font-size: 0.85em; color: #666;">
                 Completed on: ${new Date(req.created_at).toLocaleDateString()}
             </div>
+            <button class="btn btn-sm btn-outline" style="margin-top:10px; width:100%;" onclick="openChat(${req.id}, '${req.user_name}')">Chat with Patient</button>
         </div>
     `).join('');
 }
@@ -638,6 +674,53 @@ function closeAllModals() {
     loginModal.classList.add('hidden');
     registerModal.classList.add('hidden');
 }
+
+// --- Chat Functions ---
+
+function openChat(consultationId, otherName) {
+    currentChatId = consultationId;
+    chatTitle.textContent = `Chat with ${otherName}`;
+    chatWidget.classList.remove('hidden');
+    chatMessages.innerHTML = '<div class="chat-placeholder">Loading messages...</div>';
+
+    socket.emit('join_room', { consultationId });
+}
+
+closeChatBtn.addEventListener('click', () => {
+    chatWidget.classList.add('hidden');
+    currentChatId = null;
+});
+
+chatForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const message = chatInput.value;
+    if (!message || !currentChatId) return;
+
+    socket.emit('send_message', {
+        consultationId: currentChatId,
+        senderId: currentUser.id,
+        senderRole: currentUser.role,
+        senderName: currentUser.name,
+        message: message
+    });
+
+    chatInput.value = '';
+});
+
+function appendMessage(msg) {
+    // Check both ID and Role because User 1 and Doctor 1 are different people
+    const isMe = (msg.sender_id == currentUser.id) && (msg.sender_role === currentUser.role);
+    const div = document.createElement('div');
+    div.className = `message-bubble ${isMe ? 'sent' : 'received'}`;
+    div.innerHTML = `
+        ${msg.message}
+        <div class="message-info">${new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+    `;
+    chatMessages.appendChild(div);
+}
+
+// Expose Chat to Request History too
+window.openChat = openChat;
 
 // Expose functions to window
 window.toggleFollow = toggleFollow;

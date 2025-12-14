@@ -7,6 +7,10 @@ const jwt = require('jsonwebtoken');
 const path = require('path');
 
 const app = express();
+const server = require('http').createServer(app);
+const io = require('socket.io')(server, {
+    cors: { origin: "*" }
+});
 const PORT = 5000;
 const SECRET_KEY = 'super_secret_medrec_key';
 
@@ -75,6 +79,18 @@ function initDb() {
             reason TEXT,
             safe BOOLEAN,
             suggested_by TEXT,
+            FOREIGN KEY(consultation_id) REFERENCES consultations(id)
+        )`);
+
+        // Messages Table (Chat)
+        db.run(`CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            consultation_id INTEGER,
+            sender_id INTEGER,
+            sender_role TEXT, -- 'user' or 'doctor'
+            sender_name TEXT,
+            message TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(consultation_id) REFERENCES consultations(id)
         )`);
 
@@ -517,6 +533,53 @@ app.post('/api/doctor/consultations/:id/approve', authenticateToken, (req, res) 
     });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+// --- Socket.IO Logic ---
+
+io.on('connection', (socket) => {
+    console.log('New client connected:', socket.id);
+
+    // Join a consultation room
+    socket.on('join_room', ({ consultationId }) => {
+        socket.join(`consultation_${consultationId}`);
+        console.log(`Socket ${socket.id} joined room consultation_${consultationId}`);
+        
+        // Load previous messages
+        db.all("SELECT * FROM messages WHERE consultation_id = ? ORDER BY timestamp ASC", [consultationId], (err, rows) => {
+            if (!err) {
+                socket.emit('load_messages', rows);
+            }
+        });
+    });
+
+    // Send a message
+    socket.on('send_message', (data) => {
+        const { consultationId, senderId, senderRole, senderName, message } = data;
+        
+        // Save to DB
+        db.run("INSERT INTO messages (consultation_id, sender_id, sender_role, sender_name, message) VALUES (?, ?, ?, ?, ?)",
+            [consultationId, senderId, senderRole, senderName, message],
+            function (err) {
+                if (err) return console.error(err);
+                
+                // Broadcast to room (including sender, for simple optimistic UI or confirmation)
+                const msgData = {
+                    id: this.lastID,
+                    consultation_id: consultationId,
+                    sender_id: senderId,
+                    sender_role: senderRole,
+                    sender_name: senderName,
+                    message: message,
+                    timestamp: new Date().toISOString()
+                };
+                io.to(`consultation_${consultationId}`).emit('receive_message', msgData);
+            });
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Client disconnected:', socket.id);
+    });
+});
+
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
 });
