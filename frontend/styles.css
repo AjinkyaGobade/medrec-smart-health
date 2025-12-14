@@ -454,6 +454,15 @@ textarea { resize: vertical; min-height: 140px; }
     color: white;
 }
 
+.suggested-by {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+    font-style: italic;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 0.5rem;
+}
+
 /* Badges */
 .safe-badge, .unsafe-badge, .badge {
     font-size: 0.75rem;

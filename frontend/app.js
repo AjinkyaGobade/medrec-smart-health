@@ -5,6 +5,11 @@ let currentUser = null;
 let token = localStorage.getItem('medrec_token');
 let loginType = 'user'; // 'user' or 'doctor'
 
+// Polling State
+let pollingInterval = null;
+let lastDoctorRequests = null;
+let lastUserHistory = null;
+
 // DOM Elements
 const navHome = document.getElementById('nav-home');
 const authButtons = document.getElementById('auth-buttons');
@@ -190,15 +195,41 @@ function showDashboard() {
         loadDoctors();
         loadHistory();
     }
+    startPolling();
 }
 
 function logout() {
+    stopPolling();
     token = null;
     currentUser = null;
     localStorage.removeItem('medrec_token');
     localStorage.removeItem('medrec_user');
     showHero();
     showNotification('Logged out successfully');
+}
+
+// --- Polling Logic ---
+
+function startPolling() {
+    stopPolling(); // Clear existing if any
+    
+    // Poll every 3 seconds
+    pollingInterval = setInterval(() => {
+        if (!token || !currentUser) return stopPolling();
+        
+        if (currentUser.role === 'doctor') {
+            loadDoctorRequests(true); // true = isPolling
+        } else {
+            loadHistory(true); // true = isPolling
+        }
+    }, 3000);
+}
+
+function stopPolling() {
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+    }
 }
 
 // --- User Data Functions ---
@@ -319,19 +350,25 @@ function renderSuggestions(suggestions) {
     `).join('');
 }
 
-async function loadHistory() {
+async function loadHistory(isPolling = false) {
     try {
         const res = await fetch(`${API_BASE}/user/consultations`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
         if (res.status === 401 || res.status === 403) {
-            logout();
+            if (!isPolling) logout(); // Only logout on explicit action, polling just stops ideally but logout is safer
             return;
         }
 
         const consultations = await res.json();
         if (res.ok) {
+            const jsonString = JSON.stringify(consultations);
+            if (isPolling && jsonString === lastUserHistory) {
+                return;
+            }
+            lastUserHistory = jsonString;
+
             renderHistory(consultations);
         }
     } catch (err) {
@@ -373,12 +410,20 @@ function renderHistory(consultations) {
 
 // --- Doctor Data Functions ---
 
-async function loadDoctorRequests() {
+async function loadDoctorRequests(isPolling = false) {
     try {
         const res = await fetch(`${API_BASE}/doctor/requests`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const requests = await res.json();
+        
+        // Data Diffing to prevent UI flickering / input loss
+        const jsonString = JSON.stringify(requests);
+        if (isPolling && jsonString === lastDoctorRequests) {
+            return; // No changes
+        }
+        lastDoctorRequests = jsonString;
+
         renderDoctorRequests(requests);
     } catch (err) {
         console.error(err);
